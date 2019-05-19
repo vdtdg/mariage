@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Mariez-vous! L'application</title>
+
+  <!-- import Bootstrap framework -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+  <!-- import ethers.js -->
+  <script charset="utf-8" src="https://cdn.ethers.io/scripts/ethers-v4.min.js" type="text/javascript"></script>
+
+  <!-- Logique de la page -->
+  <script type="text/javascript">
+    // Variables globales : le provider Web3 et weddingCertificateFactory
+    var web3Provider;
+    const abiFactory = [
+      {
+        "constant": true,
+        "inputs": [
+          {
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "name": "weddingCertificates",
+        "outputs": [
+          {
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "getContractCount",
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          {
+            "name": "nom1",
+            "type": "string"
+          },
+          {
+            "name": "nom2",
+            "type": "string"
+          }
+        ],
+        "name": "nouveauContrat",
+        "outputs": [
+          {
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": false,
+            "name": "certificat",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "name": "nom1",
+            "type": "string"
+          },
+          {
+            "indexed": false,
+            "name": "nom2",
+            "type": "string"
+          }
+        ],
+        "name": "WeddingAnnouncement",
+        "type": "event"
+      }
+    ];
+    const abiCertificat = [
+      {
+        "constant": false,
+        "inputs": [
+          {
+            "name": "_statut",
+            "type": "uint8"
+          }
+        ],
+        "name": "setStatut",
+        "outputs": [],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "name": "_nom1",
+            "type": "string"
+          },
+          {
+            "name": "_nom2",
+            "type": "string"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "getNoms",
+        "outputs": [
+          {
+            "name": "",
+            "type": "string"
+          },
+          {
+            "name": "",
+            "type": "string"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "getStatut",
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint8"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "constant": true,
+        "inputs": [],
+        "name": "getStatutRaw",
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint8"
+          }
+        ],
+        "payable": false,
+        "stateMutability": "view",
+        "type": "function"
+      }
+
+    ];
+    const contractAddress = "0x5c4d64579562e3dbc87d5e5f43bb3d0262f8247c";
+    var factoryContract;
+
+    // Appelée au chargement de la page. Charge l'injection Web3 de Metamask et
+    // se charge d'initialiser la page.
+    function onLoad() {
+      // Initialise le bas de page
+      const provider = ethers.getDefaultProvider('ropsten');
+      provider.getBlockNumber().then(blockNumber => {
+        document.getElementById("blockNumber").innerHTML = blockNumber;
+      });
+      provider.on('block', (res) => { document.getElementById("blockNumber").innerHTML = res; });
+
+      // Injection de metamask
+      if (typeof web3 !== 'undefined') {
+        web3Provider = new ethers.providers.Web3Provider(web3.currentProvider, 'ropsten');
+        ethereum.enable(); // Bien galère à trouver... Permet de lier le compte géré par Metamask à son objet Provider
+        document.getElementById("co_met").innerHTML = "OK";
+      }
+
+      // Vérification de la connexion à Internet
+      statutConnexion = (window.navigator.onLine) ? 'OK' : 'Pas de connexion...';
+      document.getElementById("co_int").innerHTML = statutConnexion;
+      window.addEventListener("offline", function () { document.getElementById("co_int").innerHTML = "Pas de connexion..."; }, false);
+      window.addEventListener("online", function () { document.getElementById("co_int").innerHTML = "OK"; }, false);
+
+      // Initialisation du compteur de contrat de mariage.
+      factoryContract = new ethers.Contract(contractAddress, abiFactory, web3Provider.getSigner(0));
+      factoryContract.on('WeddingAnnouncement', (certificat, nom1, nom2) => {
+        document.getElementById("listeNouveauxMariages").innerHTML += certificat + " : " + nom1 + " et " + nom2 + " ! <br />";
+        factoryContract.getContractCount().then(result => { document.getElementById("nombreContrat").innerHTML = result.toNumber(); } );
+        document.getElementsByName("inputAdresseCertificat")[0].value = certificat;
+        document.getElementById("info").innerHTML = "Nouveau contrat disponible @<a href=\"https://ropsten.etherscan.io/address/" + certificat + "\">" + certificat + "</a>";
+      });
+      factoryContract.getContractCount().then(result => { document.getElementById("nombreContrat").innerHTML = result.toNumber(); } ); // La duplication de code, c'est le mal.
+    }
+
+    // Génère le nouveau contrat sur le réseau ropsten
+    async function nouveauContrat() {
+      console.log("Appel de la fonction nouveauContrat");
+      var nom1 = document.forms["formulaireNouveauContrat"]["nom1"].value;
+      var nom2 = document.forms["formulaireNouveauContrat"]["nom2"].value;
+      if (nom1 == "" || nom2 == "") {
+        alert("Les noms doivent être remplis");
+        return false;
+      }
+      console.log("Création d'un contrat avec " + nom1 + " et " + nom2);
+      retour = await factoryContract.nouveauContrat(nom1, nom2);
+      document.getElementById("info").innerHTML = "Transaction en cours, <a href=\"https://ropsten.etherscan.io/tx/" + retour.hash + "\">" + retour.hash + "</a>";
+      await retour.wait(); // Attendre la confirmation de la tx.
+      console.log("Vive les mariés !");
+    }
+
+    // Vérifie une adresse d'un contrat de mariage et affiche les noms
+    function verifierContratMariage() {
+      console.log("Appel de la fonction verifierContratMariage");
+      var adresseCertificat = document.getElementsByName("inputAdresseCertificat")[0].value;
+      if(adresseCertificat == "") { return; }
+      var contractMariage = new ethers.Contract(adresseCertificat, abiCertificat, web3Provider);
+      contractMariage.getNoms().then(result => {
+        document.getElementById("nomEpoux1").innerHTML = result[0];
+        document.getElementById("nomEpoux2").innerHTML = result[1];
+      });
+      contractMariage.getStatut().then(result => {
+        statut = result == 0 ? "Mariés" : "Divorcés";
+        document.getElementById("statutMariage").innerHTML = statut;
+      });
+    }
+
+    // Génère le nouveau contrat sur le réseau ropsten
+    async function divorce() {
+      console.log("Appel de la fonction divorce");
+      var adresseCertificat = document.getElementById("inputAdresseDivorce").value;
+      if (adresseCertificat == "") {
+        alert("L'adresse du certificat doit être renseignée.");
+        return false;
+      }
+      var contractMariage = new ethers.Contract(adresseCertificat, abiCertificat, web3Provider.getSigner(0));
+      retour = await contractMariage.setStatut(1); // 1 correspond à Statut.DIVORCE
+      document.getElementById("infoDivorce").innerHTML = "Transaction en cours, <a href=\"https://ropsten.etherscan.io/tx/" + retour.hash + "\">" + retour.hash + "</a>";
+      await retour.wait(); // Attendre la confirmation de la tx.
+      document.getElementById("infoDivorce").innerHTML = "Révocation du contrat effectuée";
+    }
+
+  </script>
+  <style>
+  .footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 60px;
+    line-height: 60px;
+    background-color: #f5f5f5;
+  }
+  </style>
+</head>
+
+<body onload="onLoad()">
+  <header class="jumbotron">
+    <div class="container">
+      <h1 class="display-1">Mariez-vous!</h1>
+      <p class="lead well">Et scellez votre contrat de mariage dans la blockchain Ethereum Ropsten!</p>
+      <h4>Requis</h4>
+      <div>
+        Connexion à Internet : <span class="badge badge-secondary" id="co_int">OK</span>
+        <br/>
+        Connexion à Metamask : <span class="badge badge-secondary" id="co_met">Pas de connexion...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+          <a href="#creerContratTab" class="nav-link active" data-toggle="tab">Création</a>
+      </li>
+      <li class="nav-item">
+          <a href="#verificationTab" class="nav-link" data-toggle="tab">Vérification</a>
+      </li>
+      <li class="nav-item">
+          <a href="#dernierContratsTab" class="nav-link" data-toggle="tab">Dernier contrats</a>
+      </li>
+      <li class="nav-item">
+          <a href="#divorceTab" class="nav-link" data-toggle="tab">Divorce</a>
+      </li>
+      <li class="nav-item">
+          <a href="#infosTab" class="nav-link" data-toggle="tab">A propos</a>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="creerContratTab">
+        <br/>
+        <h4>Créer un nouveau contrat de mariage</h4>
+
+        <form name="formulaireNouveauContrat" onsubmit="return nouveauContrat()" method="get">
+          <div class="form-group row">
+            <label for="inputNom1" class="col-sm-2 col-form-label">Nom du marié : </label>
+            <div class="col-sm-10">
+              <input type="text" name="nom1" class="form-control" id="inputNom1">
+            </div>
+          </div>
+          <div class="form-group row">
+            <label for="inputNom2" class="col-sm-2 col-form-label">Nom de la mariée :</label>
+            <div class="col-sm-10">
+              <input type="text" name="nom2" class="form-control" id="inputNom2">
+            </div>
+          </div>
+          <div class="form-group row">
+            <div class="col-sm-10 offset-sm-2">
+              <button type="button" class="btn btn-primary" onclick='nouveauContrat()'>Inscrire un nouveau contrat de mariage</button>
+            </div>
+          </div>
+        </form>
+        <span id="info"></span>
+      </div>
+
+
+      <div class="tab-pane fade" id="verificationTab">
+        <br/>
+        <h4>Vérification d'un contrat de mariage</h4>
+
+        <div class="form-group row">
+          <label for="inputAdresseCertificat" class="col-sm-3 col-form-label">Adresse du certificat de mariage : </label>
+          <div class="col-sm-6">
+            <input type="text" id="inputAdresseCertificat" name="inputAdresseCertificat" class="form-control"/>
+          </div>
+          <button class="btn btn-primary col-sm-3" type="button" onclick='verifierContratMariage()'>Vérifier</button>
+        </div>
+        <table class="table table-bordered table-striped">
+          <tr>
+            <th><b>Nom 1</b></th>
+            <th><b>Nom 2</b></th>
+            <th><b>Statut du mariage</b></th>
+          </tr>
+          <tr>
+            <td id="nomEpoux1">&nbsp;</td>
+            <td id="nomEpoux2">&nbsp;</td>
+            <td id="statutMariage">&nbsp;</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="tab-pane fade" id="dernierContratsTab">
+        <br/>
+        <h4>Nombre de contrat existant</h4>
+        <p>Ce sont déjà <span id="nombreContrat">0</span> contrats de scellés dans la blockchain !</p>
+        <h4>Mariés depuis votre arrivée sur la page:</h4>
+        <p id="listeNouveauxMariages"></p>
+      </div>
+
+      <div class="tab-pane fade" id="divorceTab">
+        <br/>
+        <h4>Divorce</h4>
+
+        <div class="form-group row">
+          <label for="inputAdresseDivorce" class="col-sm-3 col-form-label">Adresse du certificat de mariage : </label>
+          <div class="col-sm-6">
+            <input type="text" id="inputAdresseDivorce" name="inputAdresseDivorce" class="form-control"/>
+          </div>
+          <button class="btn btn-danger col-sm-3" type="button" onclick='divorce()'>Divorcer</button>
+        </div>
+        <div class="row">
+          <span id="infoDivorce"></span>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="infosTab">
+        <br/>
+        <h4>A propos</h4>
+        <p>Cette application a été développée dans le cadre de l'UE Systèmes avancés du Master SRIV de l'université Claude Bernard de Lyon.</p>
+        <h4>Auteur</h4>
+        <p>Valérian de THEZAN de GAUSSAN, étudiant en Master SRIV.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="footer">
+  <!-- <hr/> -->
+    <div class="container">
+      <div class="text-muted">Numéro du bloc courant (Réseau ropsten) : <span id="blockNumber">0</span></div>
+    </div>
+  </footer>
+</body>
+</html>
